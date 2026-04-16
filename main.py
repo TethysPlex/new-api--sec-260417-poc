@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Local-only PoC for the PrivHub Stripe webhook forgery issue.
+Local-only PoC for the New API Stripe webhook forgery issue.
 Enhanced with auto-order creation, bulk testing, concurrency, and report generation.
 """
 
@@ -232,7 +232,7 @@ def send_webhook(target_url: str, payload_bytes: bytes, stripe_signature: str, t
         headers={
             "Content-Type": "application/json",
             "Stripe-Signature": stripe_signature,
-            "User-Agent": "privhub-local-poc/3.0",
+            "User-Agent": "StripeWebhookBot",
         },
     )
 
