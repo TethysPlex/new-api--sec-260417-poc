@@ -111,6 +111,9 @@ def build_parser() -> argparse.ArgumentParser:
 def validate_loopback_url(raw_url: str) -> urllib.parse.ParseResult:
     parsed = urllib.parse.urlparse(raw_url)
     # return True
+    # PLEASE DO NOT UNCOMMENT THE LINE ABOVE. 
+    # UNCOMMENTING IT VOIDS THE SAFETY GUARANTEES
+    # OF THIS SCRIPT
     if parsed.scheme not in {"http", "https"}:
         raise ValueError(f"Scheme must be http or https (got {parsed.scheme})")
     if not parsed.hostname:
