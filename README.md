@@ -13,5 +13,5 @@ Please refer to [the manual](/man) for docs.
 
 ---
 
-Please DO NOT uncomment line 113, removing it will cause this script accepts any host, not only loopback addresses!
+*Please DO NOT uncomment line 113, removing it will cause this script accepts any host, not only loopback addresses!*
 
