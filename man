@@ -1,0 +1,156 @@
+NAME
+       newapi-webhook-poc - Local-only Proof of Concept for New API Stripe 
+       webhook forgery vulnerability
+
+SYNOPSIS
+       newapi-webhook-poc { --base-url URL | --file FILE }
+                           [ --token TOKEN ] [ --trade-no ID ]
+                           [ OPTIONS ]...
+
+DESCRIPTION
+       newapi-webhook-poc is a security testing utility designed to demon-
+       strate a webhook signature verification bypass in PrivHub. The vulnera-
+       bility occurs when Stripe is unconfigured (empty StripeWebhookSecret), 
+       allowing unauthenticated attackers to forge checkout.session.completed 
+       events using a completely empty HMAC secret.
+
+       By default, this tool operates in an automated pipeline. If a known 
+       target order (trade_no) is not provided, the tool will attempt to auto-
+       matically authenticate, probe the target for applicable payment methods 
+       (e.g., Alipay or WeChat Pay), generate a new pending order, and subse-
+       quently forge a Stripe webhook to complete that order.
+
+       SECURITY RESTRICTION: As an intentionally constrained Proof of Concept, 
+       this tool restricts all outbound network traffic exclusively to loopback 
+       interfaces (localhost, 127.0.0.1, ::1). Any attempt to target external 
+       network addresses will be safely aborted.
+
+OPTIONS
+   Target Specifications
+       Exactly one of the following target options must be specified.
+
+       --base-url URL
+              Specify a single local base URL to test (e.g., http://127.0.0.1:3000).
+
+       --file FILE
+              Path to a newline-separated file containing multiple base URLs. 
+              Automatically deduplicates entries and safely skips non-loopback URLs.
+
+       --path PATH
+              The webhook endpoint path to append to the base URL.
+              Default: /api/stripe/webhook
+
+   Authentication & Order Generation
+       --token TOKEN
+              Session token to be sent in the HTTP Cookie header (session=TOKEN). 
+              REQUIRED if --trade-no is not provided, as it is used to authenticate 
+              and auto-create the order.
+
+       --trade-no ID
+              A known, pending out_trade_no to inject into the client_reference_id 
+              field of the forged payload. If omitted, the tool automatically 
+              initiates the order creation routine.
+
+       --topup-amount AMOUNT
+              The amount to use when automatically creating a new order.
+              Default: 500
+
+   Concurrency & Export
+       --concurrency N
+              The number of concurrent worker threads to use when processing a 
+              target file. 
+              Default: 1 (Linear execution)
+
+       --output-json FILE
+              Export the execution results, HTTP status codes, and server response 
+              details to the specified file in JSON format.
+
+       --output-csv FILE
+              Export the execution results to the specified file in CSV format.
+
+   Webhook Payload Parameters
+       --customer ID
+              Fake Stripe customer ID injected into the event payload.
+              Default: cus_poc_local
+
+       --amount-total AMOUNT
+              Fake transaction total in Stripe minor units.
+              Default: 100
+
+       --currency CURRENCY
+              Fake transaction currency.
+              Default: usd
+
+       --timestamp UNIX_TIMESTAMP
+              Unix timestamp embedded into the forged Stripe-Signature header.
+              Default: Current system time
+
+       --event-id ID
+              Fake Stripe event ID.
+              Default: evt_poc_local
+
+       --session-id ID
+              Fake Stripe Checkout Session ID.
+              Default: cs_poc_local
+
+       --api-version VERSION
+              Stripe API version string injected into the event payload.
+              Default: 2020-08-27
+
+   Network Parameters
+       --timeout SECONDS
+              Maximum time in seconds to wait for HTTP responses.
+              Default: 10.0
+
+       --insecure-tls
+              Disable TLS certificate verification for targets utilizing 
+              self-signed HTTPS certificates.
+
+AUTOMATED WORKFLOW
+       When --trade-no is omitted, the tool executes the following sequence:
+
+       1. Probing (GET /api/user/topup/info)
+          The tool sends an authenticated request to the topup info endpoint. 
+          It strictly verifies that 'enable_stripe_topup' is false. It then 
+          scans 'pay_methods' to locate an alternative payment gateway (ei-
+          ther 'alipay' or 'wxpay').
+
+       2. Order Creation (POST /api/user/pay)
+          Using the discovered payment method and the specified --topup-amount, 
+          the tool issues a payment request and extracts the generated 
+          'out_trade_no' from the JSON response.
+
+       3. Forgery (POST /api/stripe/webhook)
+          The tool crafts a malicious Stripe event payload using the extracted 
+          trade number. It signs the payload using an empty string as the HMAC 
+          secret and posts it without authentication cookies to bypass the logic.
+
+EXAMPLES
+       Target a single local instance with an existing trade number:
+              newapi-webhook-poc --base-url http://127.0.0.1:3000 \
+                                  --trade-no USR1677NO0rdfFp1776348175
+
+       Auto-create an order and exploit a single local instance:
+              newapi-webhook-poc --base-url http://127.0.0.1:3000 \
+                                  --token "eyJhbGciOiJIUzI1NiIn..." \
+                                  --topup-amount 200
+
+       Bulk test multiple local environments concurrently and save to CSV:
+              newapi-webhook-poc --file local_targets.txt \
+                                  --token "eyJhbGciOiJIUzI1NiIn..." \
+                                  --concurrency 5 \
+                                  --output-csv results.csv
+
+EXIT STATUS
+       0      Successful execution of the testing suite (regardless of whether 
+              individual targets were vulnerable or rejected the payload).
+       1      A critical initialization error occurred, such as invalid arguments 
+              or missing dependencies.
+
+AUTHOR
+       Written for Security Proof of Concept & Educational Purposes.
+
+LIMITATIONS
+       This tool intentionally refuses to operate against external, non-loopback 
+       network addresses to prevent misuse. Modifying the LOOPBACK_HOSTS constant 
+       voids the safety guarantees of this script.
